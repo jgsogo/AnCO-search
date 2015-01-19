@@ -226,7 +226,12 @@ int main(int argc, char* argv[]) {
 
     std::cout << "7) Search for actual path in the ORIGINAL graph" << std::endl;
     std::cout << "\t expected length: 'steps <= " << max_length << "'" << std::endl;
-    
+    std::cout << "\t selected meta-path: " << (*best_metapath.first.begin())->init;
+    for (auto it = best_metapath.first.begin(); it!= best_metapath.first.end(); ++it) {
+        std::cout << " -> " << (*it)->end;
+        }
+    std::cout << std::endl;
+
     std::cout << std::endl << "... press INTRO to continue" << std::endl; getchar();
 
     AnCO::colony<algorithm::aco_multiobjetivo> search_colony(graph, cfg.n_ants_per_colony, max_length);
