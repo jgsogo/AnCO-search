@@ -22,6 +22,7 @@ struct success_meta : success_node_found {
     void add_to_succesful(std::vector<edge_ptr>& path) {
         // compute hash
         std::string hash = std::accumulate(path.begin(), path.end(), (*path.begin())->init, [](std::string x, edge_ptr ptr){ return x+ptr->end;});
+        std::cout << hash << std::endl;
         std::set<std::string>::iterator it; bool inserted;
         std::tie(it, inserted) = hash_paths.insert(hash);
         if (inserted) {

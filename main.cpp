@@ -205,7 +205,7 @@ int main(int argc, char* argv[]) {
         std::cout << "\t - candidate meta-paths" << std::endl;
         std::cout << "\t\t cost | path" << std::endl;
         for (auto it = success.succesful_paths.begin(); it!=success.succesful_paths.end(); ++it) {
-            max_length = (std::max)(max_length, it->size()*(cfg.max_steps-1)*2); // ¡las colonias pueden haberse visto justo en sus extremos!
+            max_length = (std::max)(int(max_length), int(it->size()*(cfg.max_steps-1)*2)); // ¡las colonias pueden haberse visto justo en sus extremos!
             float cost = std::accumulate(it->begin(), it->end(), 0.f, [](float x, edge_ptr ptr){ return x + ptr->data.length;});
             std::cout << "\t\t" << cost << " | " << (*it->begin())->init;
             for (auto jj = it->begin(); jj!=it->end(); ++jj) {
@@ -217,6 +217,13 @@ int main(int argc, char* argv[]) {
                 best_metapath = std::make_pair( *it, cost );
                 }
             }
+        // y el último path es
+        float cost = std::accumulate(success.tmp.begin(), success.tmp.end(), 0.f, [](float x, edge_ptr ptr){ return x + ptr->data.length;});
+        std::cout << "\t\t" << cost << ".|." << (*success.tmp.begin())->init;
+        for (auto jj = success.tmp.begin(); jj!=success.tmp.end(); ++jj) {
+            std::cout << " -> " << (*jj)->end;
+            }
+        std::cout << std::endl;
         }
     else {
         std::cout << "\t>>!! NO PATH FOUND IN META-GRAPH" << std::endl;
@@ -224,53 +231,113 @@ int main(int argc, char* argv[]) {
         }
     std::cout << std::endl << "------------------------ end META-GRAPH ---------------------" << std::endl << std::endl;
 
-    std::cout << "7) Search for actual path in the ORIGINAL graph" << std::endl;
-    std::cout << "\t expected length: 'steps <= " << max_length << "'" << std::endl;
-    std::cout << "\t selected meta-path: " << (*best_metapath.first.begin())->init;
-    for (auto it = best_metapath.first.begin(); it!= best_metapath.first.end(); ++it) {
-        std::cout << " -> " << (*it)->end;
-        }
-    std::cout << std::endl;
-
-    std::cout << std::endl << "... press INTRO to continue" << std::endl; getchar();
-
-    AnCO::colony<algorithm::aco_multiobjetivo> search_colony(graph, cfg.n_ants_per_colony, max_length);
-    search_colony.set_base_node(start_node->id);
-    algorithm::aco_multiobjetivo::objective_list.clear();
-    float objective_price = 1/(float)best_metapath.first.size();
-    float sum_price = 0.f;
-    for (auto it = best_metapath.first.begin(); it!= best_metapath.first.end(); ++it) {
-        sum_price += objective_price;
-        int pherom_id = -1;
-        if ( (*it)->end == end_colony.get_base_node()) {
-            pherom_id = end_colony.get_id();
+    {
+        std::cout << "7) Search for actual path in the ORIGINAL graph (using best meta-path)" << std::endl;
+        std::vector<edge_ptr> metapath = best_metapath.first;
+        std::cout << "\t expected length: 'steps <= " << max_length << "'" << std::endl;
+        std::cout << "\t selected meta-path: " << (*metapath.begin())->init;
+        for (auto it = metapath.begin(); it!= metapath.end(); ++it) {
+            std::cout << " -> " << (*it)->end;
             }
-        else {
-            for (auto c = colonies.begin(); c!=colonies.end(); ++c) {
-                if ( (*it)->end == (*c)->get_base_node()) {
-                    pherom_id = (*c)->get_id();
+        std::cout << std::endl;
+
+        std::cout << std::endl << "... press INTRO to continue" << std::endl; getchar();
+
+        AnCO::colony<algorithm::aco_multiobjetivo> search_colony(graph, cfg.n_ants_per_colony, max_length);
+        search_colony.set_base_node(start_node->id);
+        algorithm::aco_multiobjetivo::objective_list.clear();
+        float objective_price = 1/(float)metapath.size();
+        float sum_price = 0.f;
+        for (auto it = metapath.begin(); it!= metapath.end(); ++it) {
+            sum_price += objective_price;
+            int pherom_id = -1;
+            if ( (*it)->end == end_colony.get_base_node()) {
+                pherom_id = end_colony.get_id();
+                }
+            else {
+                for (auto c = colonies.begin(); c!=colonies.end(); ++c) {
+                    if ( (*it)->end == (*c)->get_base_node()) {
+                        pherom_id = (*c)->get_id();
+                        }
                     }
                 }
+            assert(pherom_id != -1);
+            algorithm::aco_multiobjetivo::objective_list[(*it)->end] = std::make_pair(pherom_id, sum_price);
             }
-        assert(pherom_id != -1);
-        algorithm::aco_multiobjetivo::objective_list[(*it)->end] = std::make_pair(pherom_id, sum_price);
-        }
 
-    //success_meta success(end_node->id);
-    iterations = 0;
-    success_node_found suc_multiobj(end_node->id);
-    while (++iterations < cfg.training_iterations+100) {
-        std::cout << ".";
-        colony_meta.run();
-        end_colony.run();
-        search_colony.run(suc_multiobj);
-        
-        colony_meta.update();
-        end_colony.update();
-        search_colony.update();
-        
-        colony_type::aco_algorithm_impl::update_graph(graph);        
-        }
+        //success_meta success(end_node->id);
+        iterations = 0;
+        success_node_found suc_multiobj(end_node->id);
+        while (++iterations < cfg.training_iterations+100) {
+            std::cout << ".";
+            colony_meta.run();
+            end_colony.run();
+            search_colony.run(suc_multiobj);
+            
+            colony_meta.update();
+            end_colony.update();
+            search_colony.update();
+            
+            colony_type::aco_algorithm_impl::update_graph(graph);        
+            std::cout << std::flush;
+            }
+        std::cout << std::endl;
+    }
+
+
+    {
+        std::cout << std::endl << "8) Search for actual path in the ORIGINAL graph (using last meta-path)" << std::endl;
+        std::vector<edge_ptr> metapath = success.tmp;
+        std::cout << "\t expected length: 'steps <= " << max_length << "'" << std::endl;
+        std::cout << "\t selected meta-path: " << (*metapath.begin())->init;
+        for (auto it = metapath.begin(); it!= metapath.end(); ++it) {
+            std::cout << " -> " << (*it)->end;
+            }
+        std::cout << std::endl;
+
+        std::cout << std::endl << "... press INTRO to continue" << std::endl; getchar();
+
+        AnCO::colony<algorithm::aco_multiobjetivo> search_colony(graph, cfg.n_ants_per_colony, max_length);
+        search_colony.set_base_node(start_node->id);
+        algorithm::aco_multiobjetivo::objective_list.clear();
+        float objective_price = 1/(float)metapath.size();
+        float sum_price = 0.f;
+        for (auto it = metapath.begin(); it!= metapath.end(); ++it) {
+            sum_price += objective_price;
+            int pherom_id = -1;
+            if ( (*it)->end == end_colony.get_base_node()) {
+                pherom_id = end_colony.get_id();
+                }
+            else {
+                for (auto c = colonies.begin(); c!=colonies.end(); ++c) {
+                    if ( (*it)->end == (*c)->get_base_node()) {
+                        pherom_id = (*c)->get_id();
+                        }
+                    }
+                }
+            assert(pherom_id != -1);
+            algorithm::aco_multiobjetivo::objective_list[(*it)->end] = std::make_pair(pherom_id, sum_price);
+            }
+
+        //success_meta success(end_node->id);
+        iterations = 0;
+        success_node_found suc_multiobj(end_node->id);
+        while (++iterations < cfg.training_iterations+100) {
+            std::cout << ".";
+            colony_meta.run();
+            end_colony.run();
+            search_colony.run(suc_multiobj);
+            
+            colony_meta.update();
+            end_colony.update();
+            search_colony.update();
+            
+            colony_type::aco_algorithm_impl::update_graph(graph);        
+            std::cout << std::flush;
+            }
+        std::cout << std::endl;
+    }
+
 
     std::cout << "Done" << std::endl;
     getchar();
