@@ -30,6 +30,7 @@
 #include "jgsogo/AnCO/utils/sleep.h"
 
 #include "success_meta.h"
+#include "aco_multiobjetivo.h"
 
 #ifdef _WINDOWS
     #include <windows.h>
@@ -79,18 +80,18 @@ int main(int argc, char* argv[]) {
     dataset.load_file();
     t.toc();    
 
-    std::cout << "2) Make graph available on memory" << std::endl;
+    std::cout << std::endl << "2) Make graph available on memory" << std::endl;
     t.tic();
     AnCO::memgraph graph(dataset);
     t.toc();
 
-    std::cout << "3) Create neighbourhood of '" << cfg.n_colonies << "' colonies (aco_random)" << std::endl;
+    std::cout << std::endl << "3) Create neighbourhood of '" << cfg.n_colonies << "' colonies (aco_random)" << std::endl;
     neighbourhood_type colony_meta(graph, cfg.n_colonies, cfg.n_ants_per_colony, cfg.max_steps);
 
-    unsigned int max_i = 30;
-    std::cout << "4) Train for " << max_i << "iterations" << std::endl;
+    std::cout << std::endl << "4) Train for " << cfg.training_iterations << " iterations" << std::endl;
+    std::cout << std::endl << "... press INTRO to continue" << std::endl; getchar();
     unsigned int colony_meta_iteration = 0;
-    while(colony_meta_iteration < max_i) {
+    while(colony_meta_iteration < cfg.training_iterations) {
         colony_meta.run();
         colony_meta.update();
         colony_type::aco_algorithm_impl::update_graph(graph);
@@ -113,7 +114,7 @@ int main(int argc, char* argv[]) {
     colony_neighbourhood_type end_colony(graph, cfg.n_ants_per_colony, cfg.max_steps);
     end_colony.set_base_node(end_node->id);
     unsigned int iterations = 0;
-    while (++iterations < max_i) {
+    while (++iterations < cfg.training_iterations) {
         colony_meta.run();
         start_colony.run();
         end_colony.run();
@@ -144,7 +145,8 @@ int main(int argc, char* argv[]) {
         }
 
     std::cout << std::endl << "------------------------ begin META-GRAPH ---------------------" << std::endl << std::endl;
-    std::cout << "6) Build metagraph" << std::endl;
+    std::cout << "6) Build meta-graph" << std::endl;
+    std::cout << "\t (meta-graph should we running in background)" << std::endl;
     AnCO::graph_data_file_builder meta_dataset;
     // nodos
     std::cout << "\t - nodes: base node of each colony" << std::endl;
@@ -188,16 +190,19 @@ int main(int argc, char* argv[]) {
 
 
     success_meta success(end_node->id);
-    while (++iterations < max_i) {
+    while (++iterations < cfg.training_iterations) {
         search_colony.run(success);
         search_colony.update();
         colony_type::aco_algorithm_impl::update_graph(meta_graph);        
         }
+    unsigned int max_length = 0;
     if (success.succesful_paths.size()) {
+        std::cout << "\t>>!! THERE IS A PATH ******" << std::endl;
         // Select path with
         std::cout << "\t - candidate meta-paths" << std::endl;
         std::cout << "\t\t cost | path" << std::endl;
         for (auto it = success.succesful_paths.begin(); it!=success.succesful_paths.end(); ++it) {
+            max_length = (std::max)(max_length, it->size()*cfg.max_steps);
             float cost = std::accumulate(it->begin(), it->end(), 0.f, [](float x, edge_ptr ptr){ return x + ptr->data.length;});
             std::cout << "\t\t" << cost << " | " << (*it->begin())->init;
             for (auto jj = it->begin(); jj!=it->end(); ++jj) {
@@ -206,10 +211,16 @@ int main(int argc, char* argv[]) {
             std::cout << std::endl;
             }
         }
+    else {
+        std::cout << "\t>>!! NO PATH FOUND IN META-GRAPH" << std::endl;
+        return 1;
+        }
     std::cout << std::endl << "------------------------ end META-GRAPH ---------------------" << std::endl << std::endl;
 
     std::cout << "7) Search for actual path in the ORIGINAL graph" << std::endl;
+    std::cout << "\t expected length: 'steps <= " << max_length << "'" << std::endl;
     
+    std::cout << std::endl << "... press INTRO to continue" << std::endl; getchar();
 
     std::cout << "Done" << std::endl;
     getchar();
