@@ -29,6 +29,7 @@
 #include "jgsogo/AnCO/utils/threading.h"
 #include "jgsogo/AnCO/utils/sleep.h"
 
+#include "success_meta.h"
 
 #ifdef _WINDOWS
     #include <windows.h>
@@ -49,34 +50,6 @@ typedef AnCO::colony<algorithm::aco_base> colony_type;
 typedef AnCO::colony_neighbourhood<aco_algorithm, prox_algorithm> colony_neighbourhood_type;
 typedef AnCO::neighbourhood<aco_algorithm, prox_algorithm> neighbourhood_type;
 
-struct success_meta : success_node_found {
-    success_meta(_t_graph::_t_node_id id) : success_node_found(id) {};
-    success_meta(success_meta& other) : success_node_found(other.id) {};
-    virtual void new_ant() { tmp.clear();};
-    virtual bool operator()(edge_ptr ptr) {
-        tmp.push_back(ptr);
-        bool ret = (ptr->end == id);
-        if (ret) {
-            add_to_succesful(tmp);
-            }
-        return ret;
-        };
-
-    void add_to_succesful(std::vector<edge_ptr>& path) {
-        // compute hash
-        std::string hash = std::accumulate(path.begin(), path.end(), (*path.begin())->init, [](std::string x, edge_ptr ptr){ return x+ptr->end;});
-        std::set<std::string>::iterator it; bool inserted;
-        std::tie(it, inserted) = hash_paths.insert(hash);
-        if (inserted) {
-            succesful_paths.push_back(path);
-            }
-        };
-
-    std::vector<edge_ptr> tmp;
-    
-    std::set<std::string> hash_paths;
-    std::vector<std::vector<edge_ptr>> succesful_paths;
-    };
 
 int main(int argc, char* argv[]) {
     if (argc < 2) { // Check the number of parameters
@@ -170,7 +143,7 @@ int main(int argc, char* argv[]) {
         return 1;
         }
 
-    std::cout << "------------------------" << std::endl << std::endl;
+    std::cout << std::endl << "------------------------ begin META-GRAPH ---------------------" << std::endl << std::endl;
     std::cout << "6) Build metagraph" << std::endl;
     AnCO::graph_data_file_builder meta_dataset;
     // nodos
@@ -233,6 +206,10 @@ int main(int argc, char* argv[]) {
             std::cout << std::endl;
             }
         }
+    std::cout << std::endl << "------------------------ end META-GRAPH ---------------------" << std::endl << std::endl;
+
+    std::cout << "7) Search for actual path in the ORIGINAL graph" << std::endl;
+    
 
     std::cout << "Done" << std::endl;
     getchar();
